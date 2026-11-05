@@ -362,3 +362,17 @@ def test_waffle_variable_names_are_dynamic(tmp_path):
 
 def test_waffle_has_no_sample_decorator(tmp_path):
     assert scan(tmp_path, {"a.py": "@waffle_sample('x')\ndef v(): ...\n"}).flags == []
+
+
+def test_django_settings_package_is_skipped_but_similar_names_are_not(tmp_path):
+    result = scan(tmp_path, {
+        "proj/settings/production.py": "waffle.switch_is_active('p1')\n",
+        "app/views/user_settings.py": "waffle.switch_is_active('kept')\n",
+    })
+    assert [f.name for f in result.flags] == ["kept"]
+
+
+def test_php_interpolated_names_are_dynamic(tmp_path):
+    result = scan(tmp_path, {"app/C.php": 'Feature::active("beta-$x");\nFeature::active("b-{$x}");\nFeature::active(\'plain\');\n'})
+    assert [f.name for f in result.flags] == ["plain"]
+    assert len(result.dynamic) == 2

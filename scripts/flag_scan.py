@@ -13,7 +13,8 @@ SKIP_DIRS = {
     "coverage", "venv", "env", "site-packages", "bower_components",
 }
 SKIP_SUFFIXES = (".pem", ".key", ".enc", ".p12", ".min.js")
-SKIP_NAME_PARTS = ("secret", "credential", "database.yml", "database.php", "settings.py", "master.key", ".npmrc")
+SKIP_NAME_PARTS = ("secret", "credential", "database.yml", "master.key")
+SKIP_EXACT_NAMES = {"settings.py", "local_settings.py", "database.php", ".npmrc"}
 MAX_BYTES = 1_000_000
 TEST_DIRS = {"spec", "test", "tests", "__tests__", "e2e", "cypress"}
 TEST_NAME = re.compile(r"(_spec\.rb|_test\.rb|_test\.py|^test_.*\.py|^conftest\.py|\.(spec|test)\.[jt]sx?|Test\.php)$")
@@ -30,6 +31,8 @@ FOR_SCOPE = r"(?:for\((?:[^()]|\([^()]*\))*\)\s*->\s*)?"
 DYNAMIC_START = r"(?=[A-Za-z_@$])(?![\w\\]+::class)"
 OPTIONAL_REQUEST = r"(?:[A-Za-z_][\w.]*\s*,\s*)?"
 GENERICS = r"(?:<[^>()]*>)?"
+INTERPOLATION = re.compile(r"#\{|\$\{")
+PHP_INTERPOLATION = re.compile(r"\$[A-Za-z_{]|\{\$")
 
 
 @dataclass
@@ -243,7 +246,7 @@ def scan_file(rel, ext, text, frameworks):
             const = r.const if r.const is not None else (r.const_fn(text, m) if r.const_fn else None)
             names = multi_names(groups["args"]) if r.multi else literal_names(m)
             for index, (name, via_class) in enumerate(names):
-                if "#{" in name or "${" in name:
+                if INTERPOLATION.search(name) or (ext == ".php" and PHP_INTERPOLATION.search(name)):
                     dynamic.append(Dynamic(rel, line_of(text, m.start()), r.framework))
                     continue
                 key = (m.start(), index)
@@ -267,10 +270,14 @@ def pennant_class_definition(rel, ext, text):
     return klass.group(1), (renamed.group(1) if renamed else klass.group(1)), line_of(text, klass.start())
 
 
+def in_settings_package(current, root, ext):
+    return ext == ".py" and "settings" in os.path.relpath(current, root).split(os.sep)
+
+
 def skipped_file(name):
     lower = name.lower()
     return (
-        lower.startswith(".env") or lower.endswith(SKIP_SUFFIXES)
+        lower.startswith(".env") or lower.endswith(SKIP_SUFFIXES) or lower in SKIP_EXACT_NAMES
         or any(part in lower for part in SKIP_NAME_PARTS)
     )
 
@@ -281,7 +288,7 @@ def project_files(root):
         for name in sorted(names):
             path = os.path.join(current, name)
             ext = os.path.splitext(name)[1].lower()
-            if skipped_file(name) or os.path.islink(path):
+            if skipped_file(name) or os.path.islink(path) or in_settings_package(current, root, ext):
                 continue
             if not os.path.isfile(path) or os.path.getsize(path) > MAX_BYTES:
                 continue
