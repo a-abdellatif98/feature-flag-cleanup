@@ -383,3 +383,13 @@ def test_settings_module_variants_are_skipped(tmp_path):
     files = {f"app/{n}.py": f"waffle.switch_is_active('{n}')\n" for n in
              ("settings", "local_settings", "test_settings", "prod_settings", "settings_local", "base")}
     assert [f.name for f in scan(tmp_path, files).flags] == ["base"]
+
+
+def test_hidden_directories_and_virtualenvs_are_skipped(tmp_path):
+    result = scan(tmp_path, {
+        ".hidden-dir/x.rb": "Flipper.enabled?(:hid)\n",
+        "venvdir/pyvenv.cfg": "home = x\n",
+        "venvdir/lib/y.rb": "Flipper.enabled?(:venv)\n",
+        "app/ok.rb": "Flipper.enabled?(:ok)\n",
+    })
+    assert [f.name for f in result.flags] == ["ok"]

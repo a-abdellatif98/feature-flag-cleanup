@@ -107,3 +107,15 @@ def test_every_reference_is_linked_from_the_command_or_skill():
     linked = (ROOT / "skills" / "flag-cleanup" / "SKILL.md").read_text() + (ROOT / "commands" / "cleanup-flags.md").read_text()
     for path in (ROOT / "skills" / "flag-cleanup" / "references").glob("*.md"):
         assert f"references/{path.name}" in linked or path.name in linked, path.name
+
+
+def test_scanner_has_no_dynamic_escape_hatches():
+    tree = ast.parse((ROOT / "scripts" / "flag_scan.py").read_text())
+    bases = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            assert node.id not in {"__import__", "getattr", "eval", "exec", "compile", "globals", "vars"}, node.id
+            if node.id in ("os", "sys") and isinstance(node.ctx, ast.Load):
+                assert id(node) in bases, node.id
+        if isinstance(node, ast.Attribute):
+            assert not node.attr.startswith("_"), node.attr
