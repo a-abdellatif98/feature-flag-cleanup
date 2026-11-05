@@ -1,0 +1,25 @@
+{
+  "name": "feature-flag-cleanup",
+  "description": "Finds feature flags in code (Flipper, django-waffle, Laravel Pennant, and LaunchDarkly, Unleash or OpenFeature calls in Node), lists every call site per flag, marks likely-stale flags, and writes a safe removal plan per flag: which branch to keep, which tests to update, and the flag record to delete last. Works from code only and never calls a flag service",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ahmed",
+    "email": "ahmed.abdelatife@gmail.com"
+  },
+  "homepage": "https://github.com/a-abdellatif98/feature-flag-cleanup",
+  "repository": "https://github.com/a-abdellatif98/feature-flag-cleanup",
+  "license": "MIT",
+  "icon": "assets/icon.svg",
+  "keywords": [
+    "cleanup",
+    "dead-code",
+    "feature-flags",
+    "flipper",
+    "launchdarkly",
+    "openfeature",
+    "pennant",
+    "tech-debt",
+    "unleash",
+    "waffle"
+  ]
+}
