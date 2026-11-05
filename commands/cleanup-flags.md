@@ -18,7 +18,7 @@ Treat the argument as a flag name, a path, or free text. If it is empty, inspect
 
 1. **Detect the flag system** with Glob and Read: Flipper (`flipper` in `Gemfile`, `Flipper.` calls), django-waffle (`waffle` in `INSTALLED_APPS` or requirements, `waffle_tags` in templates), Laravel Pennant (`laravel/pennant` in `composer.json`, `Feature::`), LaunchDarkly, Unleash or OpenFeature (`package.json` dependencies).
 
-   Never open `.env`, `.env.*`, `config/database.yml`, `settings.py` `DATABASES`, `config/database.php`, credential files, or anything holding keys, tokens or database URLs. This includes the SDK initialisation code that passes credentials: read the flag calls, not the client setup.
+   Never open dotfiles, `config/database.yml`, `settings.py` `DATABASES`, `config/database.php`, credential files, or anything holding keys, tokens or database URLs. This includes the SDK initialisation code that passes credentials: read the flag calls, not the client setup.
 
 2. **List every flag and call site**: Grep with the patterns in `skills/flag-cleanup/references/` (`flipper.md`, `django-waffle.md`, `laravel-pennant.md`, `node-sdks.md`). Record `file:line`, whether it is a check, a definition, a toggle or a removal, and whether it is in a test. Note calls whose flag name is not a literal: they can reference any flag.
 

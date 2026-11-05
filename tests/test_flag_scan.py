@@ -253,7 +253,8 @@ def test_test_paths_are_marked(tmp_path):
 
 def test_secret_files_and_noise_dirs_are_never_read(tmp_path):
     result = scan(tmp_path, {
-        ".env": "Flipper.enabled?(:from_env)\n",
+        ".hidden-config": "Flipper.enabled?(:from_hidden)\n",
+        ".hidden.rb": "Flipper.enabled?(:from_hidden_rb)\n",
         "config/credentials.yml.enc": "Flipper.enabled?(:from_cred)\n",
         "config/database.yml": "Flipper.enabled?(:from_db)\n",
         "secrets.rb": "Flipper.enabled?(:from_secrets)\n",
@@ -323,7 +324,7 @@ def test_settings_and_connection_config_files_are_never_read(tmp_path):
         "app/settings.py": "waffle.switch_is_active('s1')\n",
         "app/local_settings.py": "waffle.switch_is_active('s2')\n",
         "config/database.php": "Feature::active('s3');\n",
-        ".npmrc": "client.variation('s4', c, false)\n",
+        ".hidden.js": "client.variation('s4', c, false)\n",
         "app/ok.py": "waffle.switch_is_active('ok')\n",
     })
     assert [f.name for f in result.flags] == ["ok"]

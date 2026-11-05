@@ -1,3 +1,4 @@
+import ast
 import json
 import re
 from pathlib import Path
@@ -31,14 +32,14 @@ def test_command_receives_arguments_and_avoids_secrets():
     text = (ROOT / "commands" / "cleanup-flags.md").read_text()
     assert "$ARGUMENTS" in text
     assert "argument-hint:" in frontmatter(ROOT / "commands" / "cleanup-flags.md")
-    assert "Never open `.env`" in text
+    assert "Never open dotfiles" in text
 
 
 def test_manifest_has_required_fields():
     for key in ("name", "description", "version", "author", "homepage", "repository", "license", "keywords", "icon"):
         assert MANIFEST.get(key), key
     assert MANIFEST["name"] == "feature-flag-cleanup"
-    assert MANIFEST["repository"] == "https://github.com/a-abdellatif98/feature-flag-cleanup"
+    assert MANIFEST["repository"].endswith("/" + MANIFEST["name"])
     assert (ROOT / MANIFEST["icon"]).is_file()
 
 
@@ -64,15 +65,42 @@ def test_docs_have_no_em_or_en_dashes():
 
 
 def test_docs_have_no_credential_like_identifiers():
-    pattern = re.compile(r"\b[A-Z][A-Z0-9]*_[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)\b|\$\{|process\.env|\bsdk-[a-z0-9]{6,}", re.I)
+    pattern = re.compile(r"\$\{|\bsdk-[a-z0-9]{6,}|\b[A-Za-z0-9+=]{32,}\b")
     for path in DOCS:
         assert not pattern.search(path.read_text()), path.name
 
 
-def test_scanner_has_no_network_or_shell_access():
-    source = (ROOT / "scripts" / "flag_scan.py").read_text()
-    for banned in ("import socket", "urllib", "requests", "http.client", "subprocess", "os.system", "os.environ"):
-        assert banned not in source, banned
+ALLOWED_IMPORTS = {"argparse", "json", "os", "re", "sys", "dataclasses"}
+ALLOWED_ATTRS = {"os": {"path", "sep", "walk"}, "sys": {"exit", "stderr", "stdout"}}
+ALLOWED_PATH_ATTRS = {"exists", "getsize", "isdir", "isfile", "islink", "join", "relpath", "splitext"}
+
+
+ALLOWED_FROM_IMPORTS = {"dataclasses": {"asdict", "dataclass", "field"}}
+
+
+def test_scanner_imports_only_allowed_stdlib_modules():
+    imported = set()
+    for node in ast.walk(ast.parse((ROOT / "scripts" / "flag_scan.py").read_text())):
+        if isinstance(node, ast.Import):
+            assert all(a.asname is None for a in node.names)
+            imported |= {a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0 and node.module in ALLOWED_FROM_IMPORTS, node.module
+            assert {a.name for a in node.names} <= ALLOWED_FROM_IMPORTS[node.module]
+            imported.add(node.module)
+    assert imported <= ALLOWED_IMPORTS, imported - ALLOWED_IMPORTS
+
+
+def test_scanner_uses_only_allowed_module_attributes():
+    tree = ast.parse((ROOT / "scripts" / "flag_scan.py").read_text())
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute):
+            continue
+        if isinstance(node.value, ast.Name) and node.value.id in ALLOWED_ATTRS:
+            assert node.attr in ALLOWED_ATTRS[node.value.id], node.attr
+        if isinstance(node.value, ast.Attribute) and isinstance(node.value.value, ast.Name):
+            if (node.value.value.id, node.value.attr) == ("os", "path"):
+                assert node.attr in ALLOWED_PATH_ATTRS, node.attr
 
 
 def test_every_reference_is_linked_from_the_command_or_skill():

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Static scan for feature flags and their call sites (Flipper, django-waffle, Laravel Pennant, Node SDKs)."""
 
 import argparse
@@ -10,11 +9,11 @@ from dataclasses import asdict, dataclass, field
 
 SKIP_DIRS = {
     "node_modules", "vendor", "__pycache__", "tmp", "log", "storage", "dist", "build",
-    "coverage", "venv", "env", "site-packages", "bower_components",
+    "coverage", "venv", "site-packages", "bower_components",
 }
 SKIP_SUFFIXES = (".pem", ".key", ".enc", ".p12", ".min.js")
 SKIP_NAME_PARTS = ("secret", "credential", "database.yml", "master.key")
-SKIP_EXACT_NAMES = {"database.php", ".npmrc"}
+SKIP_EXACT_NAMES = {"database.php"}
 SETTINGS_MODULE = re.compile(r"(^|_)settings(_|$)")
 NOT_CONFIG_SETTINGS = {"user_settings", "notification_settings", "account_settings", "profile_settings"}
 MAX_BYTES = 1_000_000
@@ -284,7 +283,7 @@ def is_settings_module(lower):
 def skipped_file(name):
     lower = name.lower()
     return (
-        lower.startswith(".env") or lower.endswith(SKIP_SUFFIXES) or lower in SKIP_EXACT_NAMES
+        lower.startswith(".") or lower.endswith(SKIP_SUFFIXES) or lower in SKIP_EXACT_NAMES
         or is_settings_module(lower)
         or any(part in lower for part in SKIP_NAME_PARTS)
     )
@@ -292,7 +291,10 @@ def skipped_file(name):
 
 def project_files(root):
     for current, dirs, names in os.walk(root):
-        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not d.startswith("."))
+        dirs[:] = sorted(
+            d for d in dirs
+            if d not in SKIP_DIRS and not d.startswith(".") and not os.path.exists(os.path.join(current, d, "pyvenv.cfg"))
+        )
         for name in sorted(names):
             path = os.path.join(current, name)
             ext = os.path.splitext(name)[1].lower()

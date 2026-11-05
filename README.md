@@ -59,7 +59,7 @@ The `flag-cleanup` skill activates when you talk about stale flags, flag debt or
 python3 scripts/flag_scan.py <project root> [--json] [--framework flipper]
 ```
 
-Standard library only. It reads source files, skips `.env*`, key and credential files, dot and dependency directories and symlinks, and opens no network connection. Exit code 1 when a flag is marked stale, 2 for a bad path. It matches literal flag names only and reports non-literal names as dynamic sites.
+Standard library only. It reads source files, skips dotfiles, key and credential files, dot and dependency directories and symlinks, and opens no network connection. Exit code 1 when a flag is marked stale, 2 for a bad path. It matches literal flag names only and reports non-literal names as dynamic sites.
 
 ## Development
 
