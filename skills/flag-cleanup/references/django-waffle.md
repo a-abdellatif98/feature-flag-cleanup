@@ -7,12 +7,12 @@ Waffle has three kinds: flags (per request, with rules such as percent and group
 | Role | Shape |
 |---|---|
 | check | `waffle.flag_is_active(request, 'x')`, `waffle.switch_is_active('x')`, `waffle.sample_is_active('x')` |
-| check | decorators `@waffle_flag('x')`, `@waffle_switch('x')`, `@waffle_sample('x')` |
+| check | decorators `@waffle_flag('x')` and `@waffle_switch('x')` |
 | check | template tags `{% flag "x" %}...{% else %}...{% endflag %}` after `{% load waffle_tags %}`, and the `switch` and `sample` tags |
 | toggle | `override_flag('x', ...)`, `override_switch`, `override_sample` from waffle's test utilities |
 | define | `Flag.objects.create(name='x')`, `get_or_create`, `update_or_create`, likewise `Switch` and `Sample`, usually in data migrations |
 
-The check functions and template tags are in the waffle docs. The decorators and test utilities are from my knowledge of the library: confirm the names for your version.
+The check functions and template tags are in the waffle docs. Confirm the decorator and test utility names for your version.
 
 ## What to look for
 

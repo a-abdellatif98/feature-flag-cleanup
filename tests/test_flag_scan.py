@@ -316,3 +316,49 @@ def test_cli_rejects_missing_directory(tmp_path):
 @pytest.mark.parametrize("name", ["scan_project", "main"])
 def test_public_api_exists(name):
     assert callable(getattr(scanner, name))
+
+
+def test_settings_and_connection_config_files_are_never_read(tmp_path):
+    result = scan(tmp_path, {
+        "app/settings.py": "waffle.switch_is_active('s1')\n",
+        "app/local_settings.py": "waffle.switch_is_active('s2')\n",
+        "config/database.php": "Feature::active('s3');\n",
+        ".npmrc": "client.variation('s4', c, false)\n",
+        "app/ok.py": "waffle.switch_is_active('ok')\n",
+    })
+    assert [f.name for f in result.flags] == ["ok"]
+
+
+def test_non_regular_files_are_skipped(tmp_path):
+    import os
+    write(tmp_path, {"app/ok.rb": "Flipper.enabled?(:ok)\n"})
+    os.mkfifo(tmp_path / "app" / "pipe.rb")
+    assert [f.name for f in scanner.scan_project(tmp_path).flags] == ["ok"]
+
+
+def test_runtime_toggle_does_not_make_other_flipper_flags_undefined(tmp_path):
+    result = scan(tmp_path, {
+        "app/c.rb": "Flipper.enable_actor(:a, user)\nFlipper.enabled?(:b)\nFlipper.enabled?(:b)\n",
+    })
+    assert "STALE-UNDEFINED" not in codes(flag(result, "b"))
+
+
+def test_interpolated_names_are_dynamic(tmp_path):
+    result = scan(tmp_path, {
+        "app/a.rb": 'Flipper.enabled?("dyn_#{x}")\n',
+        "src/a.js": "client.variation(`ld-${env}`, c, false);\nclient.getBooleanValue(`plain`, false);\n",
+    })
+    assert [f.name for f in result.flags] == ["plain"]
+    assert sorted(d.framework for d in result.dynamic) == ["flipper", "launchdarkly"]
+
+
+def test_waffle_variable_names_are_dynamic(tmp_path):
+    result = scan(tmp_path, {
+        "a.py": "waffle.flag_is_active(request, name)\nwaffle.switch_is_active(name)\nwaffle.flag_is_active(request, 'lit')\n",
+    })
+    assert [f.name for f in result.flags] == ["lit"]
+    assert [d.line for d in result.dynamic] == [1, 2]
+
+
+def test_waffle_has_no_sample_decorator(tmp_path):
+    assert scan(tmp_path, {"a.py": "@waffle_sample('x')\ndef v(): ...\n"}).flags == []

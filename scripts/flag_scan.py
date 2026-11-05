@@ -13,7 +13,7 @@ SKIP_DIRS = {
     "coverage", "venv", "env", "site-packages", "bower_components",
 }
 SKIP_SUFFIXES = (".pem", ".key", ".enc", ".p12", ".min.js")
-SKIP_NAME_PARTS = ("secret", "credential", "database.yml", "master.key")
+SKIP_NAME_PARTS = ("secret", "credential", "database.yml", "database.php", "settings.py", "master.key", ".npmrc")
 MAX_BYTES = 1_000_000
 TEST_DIRS = {"spec", "test", "tests", "__tests__", "e2e", "cypress"}
 TEST_NAME = re.compile(r"(_spec\.rb|_test\.rb|_test\.py|^test_.*\.py|^conftest\.py|\.(spec|test)\.[jt]sx?|Test\.php)$")
@@ -23,7 +23,7 @@ NEUTRAL_OPS = {"add"}
 CODE_REGISTERED = {"pennant"}
 REGISTERED_BY_CONVENTION = {"flipper", "waffle"}
 
-QUOTED = r"""(?P<q>['"])(?P<str>[^'"\n]+)(?P=q)"""
+QUOTED = r"""(?P<q>['"`])(?P<str>[^'"`\n]+)(?P=q)"""
 NAME_SYM = rf"(?::(?P<sym>\w+)|{QUOTED})"
 NAME_PENNANT = rf"(?:{QUOTED}|(?P<cls>[\\\w]+)::class)"
 FOR_SCOPE = r"(?:for\((?:[^()]|\([^()]*\))*\)\s*->\s*)?"
@@ -70,6 +70,7 @@ FLIPPER_BARE = r"\s*\]\s*\.\s*%s(?:\(\s*\))?(?=[ \t]*(?:$|[;#]))"
 TOGGLE_OP = r"(?P<op>(?:enable|disable)(?:_\w+)?)(?![\w?!])"
 PENNANT_CALL = r"\bFeature::" + FOR_SCOPE
 WAFFLE_VARIANT = r"(?P<variant>flag|switch|sample)"
+WAFFLE_DYNAMIC = r"\bflag_is_active\(\s*[\w.]+\s*,\s*(?=[A-Za-z_])|\b(?:switch|sample)_is_active\(\s*(?=[A-Za-z_])"
 
 
 def pennant_const(text, match):
@@ -115,8 +116,8 @@ RULES = [
     rule("flipper", RB, REMOVE, FLIPPER_CALL % "remove", NAME_SYM, op="remove", dyn=False),
     rule("flipper", RB, REMOVE, FLIPPER_INDEX, NAME_SYM, r"\s*\]\s*\.\s*remove\b", "remove", dyn=False),
 
-    rule("waffle", PY, CHECK, rf"\b(?P<op>{WAFFLE_VARIANT}_is_active)\(\s*{OPTIONAL_REQUEST}", QUOTED, dyn=False),
-    rule("waffle", PY, CHECK, r"@waffle_" + WAFFLE_VARIANT + r"\(\s*", QUOTED, op="decorator", dyn=False),
+    rule("waffle", PY, CHECK, rf"\b(?P<op>{WAFFLE_VARIANT}_is_active)\(\s*{OPTIONAL_REQUEST}", QUOTED, dyn=WAFFLE_DYNAMIC),
+    rule("waffle", PY, CHECK, r"@waffle_(?P<variant>flag|switch)\(\s*", QUOTED, op="decorator", dyn=False),
     rule("waffle", PY, CHECK, r"\{%-?\s*" + WAFFLE_VARIANT + r"\s+", QUOTED, op="tag", dyn=False),
     rule("waffle", PY, TOGGLE, r"\boverride_" + WAFFLE_VARIANT + r"\(\s*", QUOTED, op="override", dyn=False),
     rule("waffle", PY, DEFINE, r"\b(?P<variant>Flag|Switch|Sample)\.objects\.(?:create|get_or_create|update_or_create)\(\s*name\s*=\s*",
@@ -242,6 +243,9 @@ def scan_file(rel, ext, text, frameworks):
             const = r.const if r.const is not None else (r.const_fn(text, m) if r.const_fn else None)
             names = multi_names(groups["args"]) if r.multi else literal_names(m)
             for index, (name, via_class) in enumerate(names):
+                if "#{" in name or "${" in name:
+                    dynamic.append(Dynamic(rel, line_of(text, m.start()), r.framework))
+                    continue
                 key = (m.start(), index)
                 site = Site(rel, line_of(text, m.start()), r.role, op, test, variant, const)
                 previous = records.get(key)
@@ -279,7 +283,7 @@ def project_files(root):
             ext = os.path.splitext(name)[1].lower()
             if skipped_file(name) or os.path.islink(path):
                 continue
-            if os.path.getsize(path) > MAX_BYTES:
+            if not os.path.isfile(path) or os.path.getsize(path) > MAX_BYTES:
                 continue
             yield os.path.relpath(path, root).replace(os.sep, "/"), path, ext
 
@@ -313,7 +317,10 @@ def scan_project(root, frameworks=None):
 
 
 def mark_stale(flags, dynamic_frameworks):
-    registers = {f.framework for f in flags for s in f.sites if s.role in (DEFINE, TOGGLE) and not s.test}
+    registers = {
+        f.framework for f in flags for s in f.sites
+        if not s.test and (s.role == DEFINE or (s.role == TOGGLE and s.const is not None))
+    }
     for f in flags:
         prod = [s for s in f.sites if not s.test]
         checks = [s for s in prod if s.role == CHECK]
