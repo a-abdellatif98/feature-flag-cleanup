@@ -376,3 +376,9 @@ def test_php_interpolated_names_are_dynamic(tmp_path):
     result = scan(tmp_path, {"app/C.php": 'Feature::active("beta-$x");\nFeature::active("b-{$x}");\nFeature::active(\'plain\');\n'})
     assert [f.name for f in result.flags] == ["plain"]
     assert len(result.dynamic) == 2
+
+
+def test_settings_module_variants_are_skipped(tmp_path):
+    files = {f"app/{n}.py": f"waffle.switch_is_active('{n}')\n" for n in
+             ("settings", "local_settings", "test_settings", "prod_settings", "settings_local", "base")}
+    assert [f.name for f in scan(tmp_path, files).flags] == ["base"]

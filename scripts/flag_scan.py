@@ -14,7 +14,9 @@ SKIP_DIRS = {
 }
 SKIP_SUFFIXES = (".pem", ".key", ".enc", ".p12", ".min.js")
 SKIP_NAME_PARTS = ("secret", "credential", "database.yml", "master.key")
-SKIP_EXACT_NAMES = {"settings.py", "local_settings.py", "database.php", ".npmrc"}
+SKIP_EXACT_NAMES = {"database.php", ".npmrc"}
+SETTINGS_MODULE = re.compile(r"(^|_)settings(_|$)")
+NOT_CONFIG_SETTINGS = {"user_settings", "notification_settings", "account_settings", "profile_settings"}
 MAX_BYTES = 1_000_000
 TEST_DIRS = {"spec", "test", "tests", "__tests__", "e2e", "cypress"}
 TEST_NAME = re.compile(r"(_spec\.rb|_test\.rb|_test\.py|^test_.*\.py|^conftest\.py|\.(spec|test)\.[jt]sx?|Test\.php)$")
@@ -274,10 +276,16 @@ def in_settings_package(current, root, ext):
     return ext == ".py" and "settings" in os.path.relpath(current, root).split(os.sep)
 
 
+def is_settings_module(lower):
+    stem, ext = os.path.splitext(lower)
+    return ext == ".py" and bool(SETTINGS_MODULE.search(stem)) and stem not in NOT_CONFIG_SETTINGS
+
+
 def skipped_file(name):
     lower = name.lower()
     return (
         lower.startswith(".env") or lower.endswith(SKIP_SUFFIXES) or lower in SKIP_EXACT_NAMES
+        or is_settings_module(lower)
         or any(part in lower for part in SKIP_NAME_PARTS)
     )
 
